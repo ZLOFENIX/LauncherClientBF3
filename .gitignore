@@ -1,0 +1,7 @@
+*
+!.gitignore
+!Unit1.pas
+!Unit1.dfm
+!LauncherClient.dpr
+!icon.ico
+!LauncherClient.res
