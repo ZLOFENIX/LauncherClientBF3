@@ -19,6 +19,8 @@ tServerListenerCap = procedure(id: integer; cap0: integer; cap1: integer);cdecl;
 tServerListenerState = procedure(id: integer; value: integer);cdecl;
 tServerListenerPlayers = procedure(id: integer; value: integer);cdecl;
 tServerListenerAddr = procedure(id: integer; ip: PAnsiChar; port: integer);cdecl;
+tZMessageListener = procedure(msg: PAnsiChar);cdecl;
+tVersionListener = procedure(version: integer);cdecl;
 
   TServer = class
     public
@@ -84,12 +86,15 @@ ZLO_SetServerListenerCap:procedure(l: tServerListenerCap); cdecl;
 ZLO_SetServerListenerState:procedure(l: tServerListenerState); cdecl;
 ZLO_SetServerListenerPlayers:procedure(l: tServerListenerPlayers); cdecl;
 ZLO_SetServerListenerAddr:procedure(l: tServerListenerAddr); cdecl;
+ZLO_SetZMessageListener:procedure(l: tZMessageListener); cdecl;
+ZLO_SetVersionListener:procedure(l: tVersionListener); cdecl;
+ZLO_GetVersion:procedure(launcher: integer); cdecl;
 //Client
 ZLO_ConnectMClient:function(addr:PAnsiChar):boolean; cdecl;
 ZLO_AuthClient:procedure(mail,pass:PAnsiChar); cdecl;
 ZLO_GetServerList:procedure(); cdecl;
 ZLO_SelectServer:procedure(id: integer); cdecl;
-ZLO_RunClient:function(): boolean; cdecl;
+ZLO_RunClient:function(mode:integer): integer; cdecl;
 ZLO_GetID:function(): integer; cdecl;
 //
 ZLO_ListenServer:function(): boolean; cdecl;
@@ -213,6 +218,7 @@ ClearServers();
 serv:=0;
 form1.Button4.Enabled:=true;
 in_serverlist:=false;
+ZLO_GetVersion(1);
 ZLO_GetServerList();
 end;
 1:begin form1.Memo1.Lines.Add('Auth error');form1.button1.Enabled:=true;form1.Button2.Enabled:=false;end;
@@ -354,6 +360,16 @@ end;
 mutex.Release;
 end;
 
+procedure ZMessageListener(msg: PAnsiChar);cdecl;
+begin
+form1.Memo1.Lines.Add(msg);
+end;
+
+procedure VersionListener(version: integer);cdecl;
+begin
+form1.Memo1.Lines.Add('Launcher version on server 0x'+inttohex(version, 8));
+end;
+
 procedure InitLib();
 begin
 DllHandle:=LoadLibrary('Launcher.dll');
@@ -371,6 +387,9 @@ begin
 @ZLO_SetServerListenerState:=GetProcAddress(DllHandle, 'ZLO_SetServerListenerState');
 @ZLO_SetServerListenerPlayers:=GetProcAddress(DllHandle, 'ZLO_SetServerListenerPlayers');
 @ZLO_SetServerListenerAddr:=GetProcAddress(DllHandle, 'ZLO_SetServerListenerAddr');
+@ZLO_SetZMessageListener:=GetProcAddress(DllHandle, 'ZLO_SetZMessageListener');
+@ZLO_SetVersionListener:=GetProcAddress(DllHandle, 'ZLO_SetVersionListener');
+@ZLO_GetVersion:=GetProcAddress(DllHandle, 'ZLO_GetVersion');
 //Client
 @ZLO_ConnectMClient:=GetProcAddress(DllHandle, 'ZLO_ConnectMClient');
 @ZLO_AuthClient:=GetProcAddress(DllHandle, 'ZLO_AuthClient');
@@ -394,6 +413,8 @@ ZLO_SetServerListenerCap(@ServerListenerCap);
 ZLO_SetServerListenerState(@ServerListenerState);
 ZLO_SetServerListenerPlayers(@ServerListenerPlayers);
 ZLO_SetServerListenerAddr(@ServerListenerAddr);
+ZLO_SetZMessageListener(@ZMessageListener);
+ZLO_SetVersionListener(@VersionListener);
 if not ZLO_ListenGOS() then
 begin
 showmessage('Cant open port for GOS, you can see servers, but cannot connect');
@@ -431,7 +452,7 @@ end;
 end;
 HttpClient:=TIdHttp.Create(nil);
 try
-HttpClient.Get('http://zlofenix.org/bf3/Launcher.dll', Buffer);
+HttpClient.Get('http://zloemu.org/files/bf3/Launcher.dll?d='+inttostr(random(9999999)), Buffer);
 except
 begin
 form1.Memo1.Lines.Add('Error updating dll');
@@ -445,7 +466,7 @@ HttpClient.Free;
 form1.Memo1.Lines.Add('Dll updated');
 InitLib;
 ClearServers();
-if ZLO_ConnectMClient('zlofenix.org') then
+if ZLO_ConnectMClient('emu.bf3.zloemu.org') then
 begin
 form1.button1.Enabled:=false;
 form1.Memo1.Lines.Add('Connected to master');
@@ -465,7 +486,7 @@ FProcessEntry32.dwSize:=SizeOf(FProcessEntry32);
 result:=False;
 if Process32First(FSnapshotHandle, FProcessEntry32) then
 repeat
-if UpperCase(ExtractFileName(FProcessEntry32.szExeFile))='ZBF3.EXE' then
+if UpperCase(ExtractFileName(FProcessEntry32.szExeFile))='BF3.EXE' then
 result:=True;
 until not Process32Next(FSnapshotHandle, FProcessEntry32) or result;
 CloseHandle(FSnapshotHandle);
@@ -491,7 +512,7 @@ ini.WriteInteger('Cols','5',serverlist.ColWidths[5]);
 ini.WriteInteger('Cols','6',serverlist.ColWidths[6]);
 ini.Free;
 ClearServers();
-if ZLO_ConnectMClient('zlofenix.org') then
+if ZLO_ConnectMClient('emu.bf3.zloemu.org') then
 begin
 button1.Enabled:=false;
 Memo1.Clear;
@@ -503,14 +524,17 @@ Memo1.Lines.Add('Cant connect to master');
 end;
 
 procedure TForm1.Button2Click(Sender: TObject);
+var
+z: integer;
 begin
 if processExists() then
 begin
-memo1.Lines.Add('Zbf3 already runned.');
+memo1.Lines.Add('bf3 already runned.');
 exit;
 end;
-if not ZLO_RunClient() then
-memo1.Lines.Add('Zbf3 not fund.');
+z:=ZLO_RunClient(1);
+if z <> 0 then
+memo1.Lines.Add('Run error '+inttostr(z));
 end;
 
 procedure TForm1.Button3Click(Sender: TObject);
@@ -520,13 +544,14 @@ end;
 
 procedure TForm1.Button4Click(Sender: TObject);
 begin
-ShellExecute(0, 'open', PChar('http://zlolog.saphira-gaming.de/soldier.php?id='+inttostr(ZLO_GetID())+'&site=stats'), '', '', SW_SHOWNORMAL);
+ShellExecute(0, 'open', PChar('http://bf3.zloemu.org/stats'), '', '', SW_SHOWNORMAL);
 end;
 
 procedure TForm1.FormCreate(Sender: TObject);
 var
 ini:tinifile;
 begin
+randomize;
 servers:=TObjectDictionary<integer, TServer>.create();
 mutex:=TMutex.Create();
 if not fileexists('Launcher.dll') then
