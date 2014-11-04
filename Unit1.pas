@@ -9,6 +9,9 @@ uses
   EComponent, Vcl.ShellAnimations, Vcl.XPMan, IdTCPConnection, IdTCPClient,
   IdHTTP, Vcl.ExtCtrls, System.Generics.Collections;
 
+const
+  ZVersion = 4;
+
 type
 tEventListener = procedure(event: integer);cdecl;
 tClientListener = procedure(ztype: PAnsiChar; value: PAnsiChar);cdecl;
@@ -367,7 +370,8 @@ end;
 
 procedure VersionListener(version: integer);cdecl;
 begin
-form1.Memo1.Lines.Add('Launcher version on server 0x'+inttohex(version, 8));
+if version <> ZVersion then
+form1.Memo1.Lines.Add('Update launcher at http://bf3.zloemu.org/launchers');
 end;
 
 procedure InitLib();
