@@ -113,10 +113,10 @@ object Form1: TForm1
   object Button2: TButton
     Left = 0
     Top = 284
-    Width = 81
+    Width = 41
     Height = 25
     Anchors = [akLeft, akBottom]
-    Caption = 'Run client'
+    Caption = 'Multi'
     Enabled = False
     TabOrder = 5
     OnClick = Button2Click
@@ -157,6 +157,16 @@ object Form1: TForm1
     Enabled = False
     TabOrder = 7
     OnClick = Button4Click
+  end
+  object Button5: TButton
+    Left = 47
+    Top = 284
+    Width = 34
+    Height = 25
+    Caption = 'Single'
+    Enabled = False
+    TabOrder = 8
+    OnClick = Button5Click
   end
   object Pinger: TIdIcmpClient
     ReceiveTimeout = 2000

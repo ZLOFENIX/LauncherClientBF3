@@ -10,7 +10,7 @@ uses
   IdHTTP, Vcl.ExtCtrls, System.Generics.Collections;
 
 const
-  ZVersion = 4;
+  ZVersion = 5;
 
 type
 tEventListener = procedure(event: integer);cdecl;
@@ -51,6 +51,7 @@ tVersionListener = procedure(version: integer);cdecl;
     Button3: TButton;
     PingTimer: TTimer;
     Button4: TButton;
+    Button5: TButton;
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure Button1Click(Sender: TObject);
@@ -60,6 +61,7 @@ tVersionListener = procedure(version: integer);cdecl;
     procedure serverlistClick(Sender: TObject);
     procedure PingTimerTimer(Sender: TObject);
     procedure Button4Click(Sender: TObject);
+    procedure Button5Click(Sender: TObject);
   private
     { Private declarations }
   public
@@ -78,7 +80,6 @@ implementation
 
 var
 ZLO_Init:procedure(); cdecl;
-ZLO_ListenGOS: function(): boolean; cdecl;
 //Events
 ZLO_SetEventListener:procedure(l: tEventListener); cdecl;
 ZLO_SetClientListener:procedure(l: tClientListener); cdecl;
@@ -91,18 +92,15 @@ ZLO_SetServerListenerPlayers:procedure(l: tServerListenerPlayers); cdecl;
 ZLO_SetServerListenerAddr:procedure(l: tServerListenerAddr); cdecl;
 ZLO_SetZMessageListener:procedure(l: tZMessageListener); cdecl;
 ZLO_SetVersionListener:procedure(l: tVersionListener); cdecl;
-ZLO_GetVersion:procedure(launcher: integer); cdecl;
 //Client
-ZLO_ConnectMClient:function(addr:PAnsiChar):boolean; cdecl;
+ZLO_ConnectMClient:function():boolean; cdecl;
 ZLO_AuthClient:procedure(mail,pass:PAnsiChar); cdecl;
 ZLO_GetServerList:procedure(); cdecl;
 ZLO_SelectServer:procedure(id: integer); cdecl;
-ZLO_RunClient:function(mode:integer): integer; cdecl;
-ZLO_GetID:function(): integer; cdecl;
+ZLO_RunMulti:function(): integer; cdecl;
+ZLO_RunSingle:function(): integer; cdecl;
 //
-ZLO_ListenServer:function(): boolean; cdecl;
-ZLO_ConnectMServer:function(addr:PAnsiChar):boolean; cdecl;
-//
+ZLO_GetVersion:procedure(launcher: integer); cdecl;
 ZLO_Close:procedure(); cdecl;
 
 {$R *.dfm}
@@ -172,8 +170,6 @@ result:=m;
 end;
 
 procedure ClearServers();
-var
-id:integer;
 begin
 mutex.Acquire;
 form1.serverlist.RowCount:=1;
@@ -220,12 +216,13 @@ form1.Memo1.Lines.Add('Auth success');
 ClearServers();
 serv:=0;
 form1.Button4.Enabled:=true;
+form1.Button5.Enabled:=true;
 in_serverlist:=false;
 ZLO_GetVersion(1);
 ZLO_GetServerList();
 end;
-1:begin form1.Memo1.Lines.Add('Auth error');form1.button1.Enabled:=true;form1.Button2.Enabled:=false;end;
-2:begin form1.Memo1.Lines.Add('Old Launcher.dll');form1.Button2.Enabled:=false;form1.UpdateTimer.Enabled:=true;end;
+1:begin form1.Memo1.Lines.Add('Auth error');form1.button1.Enabled:=true;form1.Button2.Enabled:=false;form1.Button5.Enabled:=false;end;
+2:begin form1.Memo1.Lines.Add('Old Launcher.dll');form1.Button2.Enabled:=false;form1.Button5.Enabled:=false;form1.UpdateTimer.Enabled:=true;end;
 3:begin
 form1.Memo1.Lines.Add('Server select ok');
 mutex.Acquire;
@@ -244,9 +241,9 @@ end;
 6:begin form1.Memo1.Lines.Add('Server select not ready');form1.Button2.Enabled:=false;end;
 23:begin in_serverlist:=true;end;
 24:begin in_serverlist:=false;mutex.Acquire;ReDraw;mutex.Release;end;
-27:begin form1.Memo1.Lines.Add('Disconnected from master');form1.button1.Enabled:=true;form1.Button2.Enabled:=false;ClearServers();end;
-28:begin form1.Memo1.Lines.Add('Master timeout and disconnected');form1.button1.Enabled:=true;form1.Button2.Enabled:=false;ClearServers();end;
-666:begin form1.Memo1.Lines.Add('You are banned');form1.button1.Visible:=false;form1.Button2.Visible:=false;ClearServers();end;
+27:begin form1.Memo1.Lines.Add('Disconnected from master');form1.button1.Enabled:=true;form1.Button2.Enabled:=false;form1.Button5.Enabled:=false;ClearServers();end;
+28:begin form1.Memo1.Lines.Add('Master timeout and disconnected');form1.button1.Enabled:=true;form1.Button2.Enabled:=false;form1.Button5.Enabled:=false;ClearServers();end;
+666:begin form1.Memo1.Lines.Add('You are banned');form1.button1.Visible:=false;form1.Button2.Visible:=false;form1.Button5.Visible:=false;ClearServers();end;
 else
 form1.Memo1.Lines.Add('Event: ' + inttostr(event));
 end
@@ -269,8 +266,6 @@ mutex.Release;
 end;
 
 procedure ServerListenerName(id: integer; value: PAnsiChar);cdecl;
-var
-i:integer;
 begin
 mutex.Acquire;
 if servers.ContainsKey(id) then
@@ -380,7 +375,6 @@ DllHandle:=LoadLibrary('Launcher.dll');
 if Dllhandle<>0 then
 begin
 @ZLO_Init:=GetProcAddress(DllHandle, 'ZLO_Init');
-@ZLO_ListenGOS:=GetProcAddress(DllHandle, 'ZLO_ListenGOS');
 //Events
 @ZLO_SetEventListener:=GetProcAddress(DllHandle, 'ZLO_SetEventListener');
 @ZLO_SetClientListener:=GetProcAddress(DllHandle, 'ZLO_SetClientListener');
@@ -393,18 +387,15 @@ begin
 @ZLO_SetServerListenerAddr:=GetProcAddress(DllHandle, 'ZLO_SetServerListenerAddr');
 @ZLO_SetZMessageListener:=GetProcAddress(DllHandle, 'ZLO_SetZMessageListener');
 @ZLO_SetVersionListener:=GetProcAddress(DllHandle, 'ZLO_SetVersionListener');
-@ZLO_GetVersion:=GetProcAddress(DllHandle, 'ZLO_GetVersion');
 //Client
 @ZLO_ConnectMClient:=GetProcAddress(DllHandle, 'ZLO_ConnectMClient');
 @ZLO_AuthClient:=GetProcAddress(DllHandle, 'ZLO_AuthClient');
 @ZLO_GetServerList:=GetProcAddress(DllHandle, 'ZLO_GetServerList');
 @ZLO_SelectServer:=GetProcAddress(DllHandle, 'ZLO_SelectServer');
-@ZLO_RunClient:=GetProcAddress(DllHandle, 'ZLO_RunClient');
-@ZLO_GetID:=GetProcAddress(DllHandle, 'ZLO_GetID');
-//Server
-@ZLO_ListenServer:=GetProcAddress(DllHandle, 'ZLO_ListenServer');
-@ZLO_ConnectMServer:=GetProcAddress(DllHandle, 'ZLO_ConnectMServer');
+@ZLO_RunMulti:=GetProcAddress(DllHandle, 'ZLO_RunMulti');
+@ZLO_RunSingle:=GetProcAddress(DllHandle, 'ZLO_RunSingle');
 //
+@ZLO_GetVersion:=GetProcAddress(DllHandle, 'ZLO_GetVersion');
 @ZLO_Close:=GetProcAddress(DllHandle, 'ZLO_Close');
 //
 ZLO_Init();
@@ -419,11 +410,6 @@ ZLO_SetServerListenerPlayers(@ServerListenerPlayers);
 ZLO_SetServerListenerAddr(@ServerListenerAddr);
 ZLO_SetZMessageListener(@ZMessageListener);
 ZLO_SetVersionListener(@VersionListener);
-if not ZLO_ListenGOS() then
-begin
-showmessage('Cant open port for GOS, you can see servers, but cannot connect');
-form1.memo1.lines.add('Cant open port for GOS, you can see servers, but cannot connect');
-end;
 serv:=0;
 end
 else
@@ -470,7 +456,7 @@ HttpClient.Free;
 form1.Memo1.Lines.Add('Dll updated');
 InitLib;
 ClearServers();
-if ZLO_ConnectMClient('emu.bf3.zloemu.org') then
+if ZLO_ConnectMClient() then
 begin
 form1.button1.Enabled:=false;
 form1.Memo1.Lines.Add('Connected to master');
@@ -516,7 +502,7 @@ ini.WriteInteger('Cols','5',serverlist.ColWidths[5]);
 ini.WriteInteger('Cols','6',serverlist.ColWidths[6]);
 ini.Free;
 ClearServers();
-if ZLO_ConnectMClient('emu.bf3.zloemu.org') then
+if ZLO_ConnectMClient() then
 begin
 button1.Enabled:=false;
 Memo1.Clear;
@@ -536,7 +522,7 @@ begin
 memo1.Lines.Add('bf3 already runned.');
 exit;
 end;
-z:=ZLO_RunClient(1);
+z:=ZLO_RunMulti();
 if z <> 0 then
 memo1.Lines.Add('Run error '+inttostr(z));
 end;
@@ -549,6 +535,20 @@ end;
 procedure TForm1.Button4Click(Sender: TObject);
 begin
 ShellExecute(0, 'open', PChar('http://bf3.zloemu.org/stats'), '', '', SW_SHOWNORMAL);
+end;
+
+procedure TForm1.Button5Click(Sender: TObject);
+var
+z: integer;
+begin
+if processExists() then
+begin
+memo1.Lines.Add('bf3 already runned.');
+exit;
+end;
+z:=ZLO_RunSingle();
+if z <> 0 then
+memo1.Lines.Add('Run error '+inttostr(z));
 end;
 
 procedure TForm1.FormCreate(Sender: TObject);
