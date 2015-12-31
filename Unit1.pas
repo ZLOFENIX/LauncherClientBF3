@@ -10,7 +10,7 @@ uses
   IdHTTP, Vcl.ExtCtrls, System.Generics.Collections;
 
 const
-  ZVersion = 5;
+  ZVersion = 6;
 
 type
 tEventListener = procedure(event: integer);cdecl;

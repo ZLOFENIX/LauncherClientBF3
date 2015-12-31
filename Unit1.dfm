@@ -163,6 +163,7 @@ object Form1: TForm1
     Top = 284
     Width = 34
     Height = 25
+    Anchors = [akLeft, akBottom]
     Caption = 'Single'
     Enabled = False
     TabOrder = 8
